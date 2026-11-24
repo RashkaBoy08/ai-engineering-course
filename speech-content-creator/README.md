@@ -14,7 +14,7 @@ comparison, not a judgment of voice style or sound quality.
 - An OpenAI API key
 - An ElevenLabs API key and voice ID
 - An audio file in a format supported by OpenAI transcription (for example
-  MP3, WAV, M4A, MP4, or WebM), up to 25 MB
+  MP3, WAV, M4A, MP4, WebM, OGG, or FLAC), up to 25 MB
 
 ## Setup
 
@@ -49,6 +49,8 @@ You can also run `npm start` without arguments and enter the file path when
 prompted. The transcription's detected language is used for the summary,
 enhanced text, and speech generation.
 
-Each run saves its transcript, summary, enhanced text, two MP3 files,
-comparison JSON, and `report.html` in a timestamped folder under `output/`.
+Each run saves its transcript, summary, enhanced text, OpenAI and ElevenLabs
+MP3 files, comparison JSON, and `report.html` in a timestamped folder under
+`output/`. Long enhanced text is split into sequential audio parts to fit
+provider request limits; the report includes a player for every part.
 Generated output and local credentials are ignored by Git.

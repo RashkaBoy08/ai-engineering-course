@@ -6,6 +6,7 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import OpenAI from "openai";
+import { compareText, splitTextIntoChunks } from "./text-utils.js";
 
 const appDirectory = path.dirname(fileURLToPath(import.meta.url));
 const outputDirectory = path.join(appDirectory, "output");
@@ -15,6 +16,8 @@ const supportedAudioExtensions = new Set([
   ".mpeg",
   ".mpga",
   ".m4a",
+  ".flac",
+  ".ogg",
   ".wav",
   ".webm",
 ]);
@@ -207,57 +210,40 @@ async function generateElevenLabsSpeech(text) {
   return audio;
 }
 
-function tokenize(text) {
-  const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
-  return [...segmenter.segment(text.normalize("NFKC").toLocaleLowerCase())]
-    .filter((segment) => segment.isWordLike)
-    .map((segment) => segment.segment);
-}
-
-function compareText(referenceText, generatedText) {
-  const reference = tokenize(referenceText);
-  const generated = tokenize(generatedText);
-  if (reference.length === 0) {
-    throw new Error("Cannot compare speech against empty enhanced text.");
-  }
-
-  let previousRow = Array.from({ length: generated.length + 1 }, (_, index) => index);
-  for (let rowIndex = 1; rowIndex <= reference.length; rowIndex += 1) {
-    const currentRow = [rowIndex];
-    for (let columnIndex = 1; columnIndex <= generated.length; columnIndex += 1) {
-      const substitutionCost =
-        reference[rowIndex - 1] === generated[columnIndex - 1] ? 0 : 1;
-      currentRow[columnIndex] = Math.min(
-        previousRow[columnIndex] + 1,
-        currentRow[columnIndex - 1] + 1,
-        previousRow[columnIndex - 1] + substitutionCost,
-      );
+async function generateSpeechFiles(runDirectory, name, chunks, generate) {
+  const audioFiles = [];
+  for (let index = 0; index < chunks.length; index += 1) {
+    const audio = await generate(chunks[index]);
+    if (audio.length === 0) {
+      throw new Error(`${name} returned an empty audio file for part ${index + 1}.`);
     }
-    previousRow = currentRow;
-  }
 
-  const errors = previousRow[generated.length];
-  const errorRate = errors / reference.length;
-  return {
-    referenceUnits: reference.length,
-    generatedUnits: generated.length,
-    errors,
-    errorRate: Number(errorRate.toFixed(4)),
-    fidelityScore: Number(Math.max(0, 100 * (1 - errorRate)).toFixed(1)),
-  };
+    const part = chunks.length === 1 ? "" : `-${String(index + 1).padStart(2, "0")}`;
+    const filename = `${name}-speech${part}.mp3`;
+    const filePath = path.join(runDirectory, filename);
+    await writeFile(filePath, audio);
+    audioFiles.push({ filename, filePath });
+  }
+  return audioFiles;
 }
 
-async function compareSpeech(filePath, expectedText, language) {
-  const request = {
-    file: createReadStream(filePath),
-    model: "whisper-1",
-    response_format: "verbose_json",
-  };
-  if (language) request.language = language;
-  const result = await openai.audio.transcriptions.create(request);
+async function compareSpeech(audioFiles, expectedText, language) {
+  const transcripts = [];
+  for (const audioFile of audioFiles) {
+    const request = {
+      file: createReadStream(audioFile.filePath),
+      model: "whisper-1",
+      response_format: "verbose_json",
+    };
+    if (language) request.language = language;
+    const result = await openai.audio.transcriptions.create(request);
+    transcripts.push(result.text ?? "");
+  }
+
+  const transcript = transcripts.join(" ");
   return {
-    transcript: result.text ?? "",
-    ...compareText(expectedText, result.text ?? ""),
+    transcript,
+    ...compareText(expectedText, transcript),
   };
 }
 
@@ -279,7 +265,12 @@ function buildReport({
           <td>${escapeHtml(comparison.provider)}</td>
           <td>${comparison.fidelityScore}/100</td>
           <td>${(comparison.errorRate * 100).toFixed(1)}%</td>
-          <td><audio controls src="${escapeHtml(comparison.audioFilename)}"></audio></td>
+          <td>${comparison.audioFiles
+            .map(
+              (filename, index) =>
+                `<div><span>Part ${index + 1}</span> <audio controls src="${escapeHtml(filename)}"></audio></div>`,
+            )
+            .join("")}</td>
         </tr>`,
     )
     .join("");
@@ -347,29 +338,29 @@ async function createContent(audioPath, language) {
     writeFile(path.join(runDirectory, "enhanced.txt"), enhancedText, "utf8"),
   ]);
 
-  console.log("Generating speech with OpenAI and ElevenLabs...");
-  const [openaiAudio, elevenLabsAudio] = await Promise.all([
-    generateOpenAISpeech(enhancedText),
-    generateElevenLabsSpeech(enhancedText),
-  ]);
-  const openaiAudioFilename = "openai-speech.mp3";
-  const elevenLabsAudioFilename = "elevenlabs-speech.mp3";
-  const openaiAudioPath = path.join(runDirectory, openaiAudioFilename);
-  const elevenLabsAudioPath = path.join(runDirectory, elevenLabsAudioFilename);
-  await Promise.all([
-    writeFile(openaiAudioPath, openaiAudio),
-    writeFile(elevenLabsAudioPath, elevenLabsAudio),
+  const speechChunks = splitTextIntoChunks(enhancedText);
+  console.log(
+    `Generating speech with OpenAI and ElevenLabs in ${speechChunks.length} part(s)...`,
+  );
+  const [openaiAudioFiles, elevenLabsAudioFiles] = await Promise.all([
+    generateSpeechFiles(runDirectory, "openai", speechChunks, generateOpenAISpeech),
+    generateSpeechFiles(
+      runDirectory,
+      "elevenlabs",
+      speechChunks,
+      generateElevenLabsSpeech,
+    ),
   ]);
 
   console.log("Comparing generated speech transcripts...");
   const comparisons = await Promise.all([
-    compareSpeech(openaiAudioPath, enhancedText, language),
-    compareSpeech(elevenLabsAudioPath, enhancedText, language),
+    compareSpeech(openaiAudioFiles, enhancedText, language),
+    compareSpeech(elevenLabsAudioFiles, enhancedText, language),
   ]);
   comparisons[0].provider = "OpenAI";
-  comparisons[0].audioFilename = openaiAudioFilename;
+  comparisons[0].audioFiles = openaiAudioFiles.map((file) => file.filename);
   comparisons[1].provider = "ElevenLabs";
-  comparisons[1].audioFilename = elevenLabsAudioFilename;
+  comparisons[1].audioFiles = elevenLabsAudioFiles.map((file) => file.filename);
 
   const report = {
     sourceAudio: audioFilename,
