@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#10172a">
+    <title>Movie Chatbot</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Movie Chatbot home">
+          <span class="brand-icon" aria-hidden="true">M</span>
+          <span>Movie<span class="brand-accent">Chat</span></span>
+        </a>
+        <div class="topbar-actions">
+          <span class="status-pill"><span class="status-dot"></span> MongoDB tools</span>
+          <button class="button button-quiet" id="clear-button" type="button">Clear chat</button>
+        </div>
+      </header>
+
+      <section class="intro">
+        <p class="eyebrow">YOUR ENTERTAINMENT ASSISTANT</p>
+        <h1>What are you in the mood for?</h1>
+        <p class="intro-copy">Ask about movies and reviews, look up a title, or get a joke.</p>
+      </section>
+
+      <section class="preferences panel" aria-labelledby="preferences-heading">
+        <div>
+          <h2 id="preferences-heading">Your preference</h2>
+          <p>Save a favorite genre to personalize recommendations.</p>
+        </div>
+        <form id="preference-form" class="preference-form">
+          <label class="sr-only" for="favorite-genre">Favorite movie genre</label>
+          <input id="favorite-genre" maxlength="60" placeholder="e.g. Sci-Fi">
+          <button class="button button-outline" type="submit">Save</button>
+        </form>
+      </section>
+
+      <section class="chat panel" aria-label="Chat">
+        <div id="messages" class="messages" aria-live="polite">
+          <article class="message assistant-message">
+            <div class="avatar assistant-avatar" aria-hidden="true">M</div>
+            <div class="message-body">
+              <p>Hey! I can search the movie and review database, look up movies with OMDb, and find jokes. What can I help you with?</p>
+            </div>
+          </article>
+        </div>
+
+        <div id="error-banner" class="error-banner" role="alert" hidden></div>
+        <form id="chat-form" class="composer">
+          <label class="sr-only" for="message-input">Your message</label>
+          <textarea id="message-input" rows="1" maxlength="2000" placeholder="Ask about a movie, a genre, or a joke..." required></textarea>
+          <button class="send-button" id="send-button" type="submit" aria-label="Send message">
+            <span aria-hidden="true">↑</span>
+          </button>
+        </form>
+        <p class="composer-hint">Enter to send · Shift + Enter for a new line</p>
+      </section>
+
+      <footer class="footer">
+        <span>Powered by MongoDB, OMDb, icanhazdadjoke, and OpenAI</span>
+        <span>Movie Chatbot · Assignment project</span>
+      </footer>
+    </main>
+  </body>
+</html>

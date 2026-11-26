@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="360" viewBox="0 0 240 360">
+  <rect width="240" height="360" fill="#252c40"/>
+  <path d="M92 124h56v42H92z" fill="none" stroke="#9587cc" stroke-width="8" stroke-linejoin="round"/>
+  <path d="m105 155 13-14 10 10 8-8 9 12" fill="none" stroke="#9587cc" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="105" cy="136" r="4" fill="#9587cc"/>
+  <text x="120" y="199" fill="#9ba5bd" font-family="sans-serif" font-size="12" text-anchor="middle">NO POSTER AVAILABLE</text>
+</svg>
